@@ -72,11 +72,23 @@ export function startOpenRouterProxy(): string | null {
             modified = true;
           }
 
-          // Fix stream field — OpenRouter requires boolean, SDK may send null
-          if ('stream' in parsed && parsed.stream === null) {
-            parsed.stream = true;
-            modified = true;
+          // Force stream to true for messages endpoint — some OpenRouter models
+          // (e.g. Gemini) require streaming via the Anthropic messages API.
+          // The SDK sometimes sends stream:false or stream:null.
+          if ('stream' in parsed) {
+            if (parsed.stream !== true) {
+              logger.info(
+                {
+                  streamValue: parsed.stream,
+                  streamType: typeof parsed.stream,
+                },
+                'Proxy: forcing stream=true',
+              );
+              parsed.stream = true;
+              modified = true;
+            }
           }
+          // If stream is missing entirely, don't add it
 
           if (modified) {
             body = Buffer.from(JSON.stringify(parsed));
@@ -113,6 +125,10 @@ export function startOpenRouterProxy(): string | null {
         headers['authorization'] = `Bearer ${apiKey}`;
       }
       headers['host'] = upstream.hostname;
+      // Update content-length to match the (possibly rewritten) body
+      if (body.length > 0) {
+        headers['content-length'] = String(body.length);
+      }
 
       const options = {
         hostname: upstream.hostname,
