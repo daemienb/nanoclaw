@@ -78,11 +78,26 @@ export function startOpenRouterProxy(): string | null {
       const transport = upstream.protocol === 'https:' ? https : http;
       const proxyReq = transport.request(options, (proxyRes) => {
         logger.info(
-          { url: pathname, status: proxyRes.statusCode },
+          { url: pathname, status: proxyRes.statusCode, contentType: proxyRes.headers['content-type'] },
           'Proxy upstream response',
         );
-        res.writeHead(proxyRes.statusCode || 502, proxyRes.headers);
-        proxyRes.pipe(res);
+
+        // For SSE streaming responses, ensure we don't buffer
+        const responseHeaders = { ...proxyRes.headers };
+        // Remove transfer-encoding to avoid chunked encoding issues with SSE
+        delete responseHeaders['transfer-encoding'];
+        // Ensure no content-length for streaming (it's chunked from upstream)
+        delete responseHeaders['content-length'];
+
+        res.writeHead(proxyRes.statusCode || 502, responseHeaders);
+
+        // Flush each chunk immediately for SSE streaming
+        proxyRes.on('data', (chunk: Buffer) => {
+          res.write(chunk);
+        });
+        proxyRes.on('end', () => {
+          res.end();
+        });
       });
 
       proxyReq.on('error', (err: any) => {
