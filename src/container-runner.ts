@@ -263,10 +263,32 @@ async function buildContainerArgs(
   if (onecliApplied) {
     logger.info({ containerName }, 'OneCLI gateway config applied');
   } else {
-    logger.warn(
+    // Fallback: inject credentials directly via environment variables.
+    // This supports running without OneCLI (e.g. K8s, single-user setups).
+    logger.info(
       { containerName },
-      'OneCLI gateway not reachable — container will have no credentials',
+      'OneCLI not available — injecting credentials via env vars',
     );
+    const oauthToken = process.env.CLAUDE_CODE_OAUTH_TOKEN;
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    const baseUrl = process.env.ANTHROPIC_BASE_URL;
+    const authToken = process.env.ANTHROPIC_AUTH_TOKEN;
+    const claudeModel = process.env.CLAUDE_MODEL;
+
+    if (oauthToken) {
+      args.push('-e', `CLAUDE_CODE_OAUTH_TOKEN=${oauthToken}`);
+    } else if (apiKey) {
+      args.push('-e', `ANTHROPIC_API_KEY=${apiKey}`);
+    } else if (authToken) {
+      args.push('-e', `ANTHROPIC_AUTH_TOKEN=${authToken}`);
+    }
+    if (baseUrl) {
+      args.push('-e', `ANTHROPIC_BASE_URL=${baseUrl}`);
+    }
+    if (claudeModel) {
+      args.push('-e', `CLAUDE_MODEL=${claudeModel}`);
+      args.push('-e', `ANTHROPIC_MODEL=${claudeModel}`);
+    }
   }
 
   // Runtime-specific args for host gateway resolution
