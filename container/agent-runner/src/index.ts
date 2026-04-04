@@ -538,8 +538,10 @@ async function runQuery(
       resultCount++;
       const textResult =
         'result' in message ? (message as { result?: string }).result : null;
+      const errorMsg =
+        'error' in message ? (message as { error?: string }).error : null;
       log(
-        `Result #${resultCount}: subtype=${message.subtype}${textResult ? ` text=${textResult.slice(0, 200)}` : ''}`,
+        `Result #${resultCount}: subtype=${message.subtype}${textResult ? ` text=${textResult.slice(0, 200)}` : ''}${errorMsg ? ` error=${errorMsg}` : ''} full=${JSON.stringify(message).slice(0, 500)}`,
       );
       writeOutput({
         status: 'success',
