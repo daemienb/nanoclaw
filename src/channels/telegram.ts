@@ -179,7 +179,7 @@ export class TelegramChannel implements Channel {
       const botUsername = ctx.me?.username?.toLowerCase();
       if (botUsername) {
         const entities = ctx.message.entities || [];
-        const isBotMentioned = entities.some((entity) => {
+        const isBotMentioned = entities.some((entity: any) => {
           if (entity.type === 'mention') {
             const mentionText = content
               .substring(entity.offset, entity.offset + entity.length)
@@ -336,7 +336,9 @@ export class TelegramChannel implements Channel {
       const emoji = ctx.message.sticker?.emoji || '';
       storeMedia(ctx, `[Sticker ${emoji}]`);
     });
-    this.bot.on('message:location', (ctx: any) => storeMedia(ctx, '[Location]'));
+    this.bot.on('message:location', (ctx: any) =>
+      storeMedia(ctx, '[Location]'),
+    );
     this.bot.on('message:contact', (ctx: any) => storeMedia(ctx, '[Contact]'));
 
     // Handle errors gracefully
