@@ -54,7 +54,22 @@ export function startOpenRouterProxy(): string | null {
     req.on('data', (chunk: Buffer) => bodyChunks.push(chunk));
     req.on('end', () => {
       const body = Buffer.concat(bodyChunks);
-      const upstream = new URL(pathname, baseUrl);
+      // The SDK sends paths like /v1/messages but baseUrl already includes
+      // the full path (e.g. https://openrouter.ai/api/v1).
+      // We need to combine them correctly to avoid double /v1.
+      const baseUrlParsed = new URL(baseUrl);
+      const basePath = baseUrlParsed.pathname.replace(/\/$/, ''); // e.g. /api/v1
+      // Strip leading /v1 from pathname if baseUrl already ends with /v1
+      let adjustedPath = pathname;
+      if (basePath.endsWith('/v1') && pathname.startsWith('/v1/')) {
+        adjustedPath = pathname.slice(3); // /v1/messages -> /messages
+      }
+      const upstream = new URL(basePath + adjustedPath, baseUrl);
+
+      logger.info(
+        { pathname, adjustedPath, upstreamUrl: upstream.href },
+        'Proxy: forwarding request',
+      );
 
       const headers: Record<string, string> = {};
       for (const [key, value] of Object.entries(req.headers)) {
@@ -78,7 +93,11 @@ export function startOpenRouterProxy(): string | null {
       const transport = upstream.protocol === 'https:' ? https : http;
       const proxyReq = transport.request(options, (proxyRes) => {
         logger.info(
-          { url: pathname, status: proxyRes.statusCode, contentType: proxyRes.headers['content-type'] },
+          {
+            url: pathname,
+            status: proxyRes.statusCode,
+            contentType: proxyRes.headers['content-type'],
+          },
           'Proxy upstream response',
         );
 
