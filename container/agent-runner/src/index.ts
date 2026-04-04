@@ -409,6 +409,7 @@ async function runQuery(
 
   let newSessionId: string | undefined;
   let lastAssistantUuid: string | undefined;
+  let lastAssistantText: string | undefined;
   let messageCount = 0;
   let resultCount = 0;
 
@@ -515,6 +516,19 @@ async function runQuery(
       lastAssistantUuid = (message as { uuid: string }).uuid;
     }
 
+    // Capture text from assistant messages as fallback for result.result
+    // (some providers like OpenRouter may return empty result.result)
+    if (message.type === 'assistant' && 'message' in message) {
+      const msg = message as { message?: { content?: Array<{ type: string; text?: string }> } };
+      if (msg.message?.content) {
+        for (const block of msg.message.content) {
+          if (block.type === 'text' && block.text) {
+            lastAssistantText = block.text;
+          }
+        }
+      }
+    }
+
     if (message.type === 'system' && message.subtype === 'init') {
       newSessionId = message.session_id;
       log(`Session initialized: ${newSessionId}`);
@@ -545,7 +559,7 @@ async function runQuery(
       );
       writeOutput({
         status: 'success',
-        result: textResult || null,
+        result: textResult || lastAssistantText || null,
         newSessionId,
       });
     }
