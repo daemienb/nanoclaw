@@ -39,9 +39,11 @@ export function startOpenRouterProxy(): string | null {
 
   const server = http.createServer((req, res) => {
     const pathname = req.url || '/';
+    logger.info({ method: req.method, url: pathname }, 'Proxy request');
 
     // Intercept count_tokens — return fake response
     if (pathname.includes('/count_tokens')) {
+      logger.info({ url: pathname }, 'Proxy: intercepted count_tokens');
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ input_tokens: 1000 }));
       return;
@@ -75,12 +77,19 @@ export function startOpenRouterProxy(): string | null {
 
       const transport = upstream.protocol === 'https:' ? https : http;
       const proxyReq = transport.request(options, (proxyRes) => {
+        logger.info(
+          { url: pathname, status: proxyRes.statusCode },
+          'Proxy upstream response',
+        );
         res.writeHead(proxyRes.statusCode || 502, proxyRes.headers);
         proxyRes.pipe(res);
       });
 
       proxyReq.on('error', (err: any) => {
-        logger.error({ err: err.message, url: pathname }, 'Proxy upstream error');
+        logger.error(
+          { err: err.message, url: pathname },
+          'Proxy upstream error',
+        );
         res.writeHead(502);
         res.end(`Proxy error: ${err.message}`);
       });
@@ -104,4 +113,3 @@ export function startOpenRouterProxy(): string | null {
   // via the Docker bridge gateway
   return `http://172.17.0.1:${PROXY_PORT}`;
 }
-

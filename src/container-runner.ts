@@ -290,7 +290,10 @@ async function buildContainerArgs(
     // and forwards everything else to the real upstream.
     if (proxyUrl) {
       args.push('-e', `ANTHROPIC_BASE_URL=${proxyUrl}`);
-      logger.info({ containerName, proxyUrl }, 'Routing agent through OpenRouter proxy');
+      logger.info(
+        { containerName, proxyUrl },
+        'Routing agent through OpenRouter proxy',
+      );
     } else if (baseUrl) {
       args.push('-e', `ANTHROPIC_BASE_URL=${baseUrl}`);
     }
