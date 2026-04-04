@@ -288,6 +288,7 @@ async function buildContainerArgs(
     if (claudeModel) {
       args.push('-e', `CLAUDE_MODEL=${claudeModel}`);
       args.push('-e', `ANTHROPIC_MODEL=${claudeModel}`);
+      args.push('-e', `CLAUDE_CODE_USE_MODEL=${claudeModel}`);
     }
   }
 
