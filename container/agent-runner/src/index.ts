@@ -435,9 +435,16 @@ async function runQuery(
     log(`Additional directories: ${extraDirs.join(', ')}`);
   }
 
+  // Determine model: prefer CLAUDE_CODE_USE_MODEL, then CLAUDE_MODEL, then SDK default
+  const modelOverride =
+    process.env.CLAUDE_CODE_USE_MODEL ||
+    process.env.CLAUDE_MODEL ||
+    process.env.ANTHROPIC_MODEL;
+
   for await (const message of query({
     prompt: stream,
     options: {
+      ...(modelOverride ? { model: modelOverride } : {}),
       cwd: '/workspace/group',
       additionalDirectories: extraDirs.length > 0 ? extraDirs : undefined,
       resume: sessionId,
