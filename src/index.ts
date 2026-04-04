@@ -569,6 +569,15 @@ function ensureContainerSystemRunning(): void {
 
 async function main(): Promise<void> {
   ensureContainerSystemRunning();
+
+  // Start OpenRouter proxy if using a non-Anthropic API endpoint
+  const { startOpenRouterProxy } = await import('./openrouter-proxy.js');
+  const proxyUrl = startOpenRouterProxy();
+  if (proxyUrl) {
+    // Store proxy URL for container-runner to use
+    process.env.NANOCLAW_PROXY_URL = proxyUrl;
+  }
+
   initDatabase();
   logger.info('Database initialized');
   loadState();

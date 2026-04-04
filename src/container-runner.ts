@@ -274,6 +274,7 @@ async function buildContainerArgs(
     const baseUrl = process.env.ANTHROPIC_BASE_URL;
     const authToken = process.env.ANTHROPIC_AUTH_TOKEN;
     const claudeModel = process.env.CLAUDE_MODEL;
+    const proxyUrl = process.env.NANOCLAW_PROXY_URL;
 
     if (oauthToken) {
       args.push('-e', `CLAUDE_CODE_OAUTH_TOKEN=${oauthToken}`);
@@ -282,9 +283,18 @@ async function buildContainerArgs(
     } else if (authToken) {
       args.push('-e', `ANTHROPIC_AUTH_TOKEN=${authToken}`);
     }
-    if (baseUrl) {
+
+    // If we have a proxy running (for OpenRouter compatibility),
+    // point agent containers at the proxy instead of directly upstream.
+    // The proxy intercepts count_tokens (which OpenRouter doesn't support)
+    // and forwards everything else to the real upstream.
+    if (proxyUrl) {
+      args.push('-e', `ANTHROPIC_BASE_URL=${proxyUrl}`);
+      logger.info({ containerName, proxyUrl }, 'Routing agent through OpenRouter proxy');
+    } else if (baseUrl) {
       args.push('-e', `ANTHROPIC_BASE_URL=${baseUrl}`);
     }
+
     if (claudeModel) {
       args.push('-e', `CLAUDE_MODEL=${claudeModel}`);
       args.push('-e', `ANTHROPIC_MODEL=${claudeModel}`);
