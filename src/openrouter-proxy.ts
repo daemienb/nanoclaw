@@ -36,6 +36,7 @@ export function startOpenRouterProxy(): string | null {
   }
 
   const apiKey = process.env.ANTHROPIC_API_KEY || '';
+  const modelOverride = process.env.OPENROUTER_MODEL || '';
 
   const server = http.createServer((req, res) => {
     const pathname = req.url || '/';
@@ -53,7 +54,26 @@ export function startOpenRouterProxy(): string | null {
     const bodyChunks: Buffer[] = [];
     req.on('data', (chunk: Buffer) => bodyChunks.push(chunk));
     req.on('end', () => {
-      const body = Buffer.concat(bodyChunks);
+      let body = Buffer.concat(bodyChunks);
+
+      // Rewrite model name if OPENROUTER_MODEL is configured
+      // The SDK sends claude-sonnet-4-6 etc but we want to use a cheaper model
+      if (modelOverride && body.length > 0) {
+        try {
+          const parsed = JSON.parse(body.toString());
+          if (parsed.model) {
+            logger.info(
+              { from: parsed.model, to: modelOverride },
+              'Proxy: rewriting model',
+            );
+            parsed.model = modelOverride;
+            body = Buffer.from(JSON.stringify(parsed));
+          }
+        } catch {
+          // Not JSON or parse error — forward as-is
+        }
+      }
+
       // The SDK sends paths like /v1/messages but baseUrl already includes
       // the full path (e.g. https://openrouter.ai/api/v1).
       // We need to combine them correctly to avoid double /v1.
