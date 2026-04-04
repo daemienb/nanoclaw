@@ -90,7 +90,10 @@ export class TelegramChannel implements Channel {
       const fileUrl = `https://api.telegram.org/file/bot${this.botToken}/${file.file_path}`;
       const resp = await fetch(fileUrl);
       if (!resp.ok) {
-        logger.warn({ fileId, status: resp.status }, 'Telegram file download failed');
+        logger.warn(
+          { fileId, status: resp.status },
+          'Telegram file download failed',
+        );
         return null;
       }
 
@@ -113,7 +116,7 @@ export class TelegramChannel implements Channel {
     });
 
     // Command to get chat ID (useful for registration)
-    this.bot.command('chatid', (ctx) => {
+    this.bot.command('chatid', (ctx: any) => {
       const chatId = ctx.chat.id;
       const chatType = ctx.chat.type;
       const chatName =
@@ -128,7 +131,7 @@ export class TelegramChannel implements Channel {
     });
 
     // Command to check bot status
-    this.bot.command('ping', (ctx) => {
+    this.bot.command('ping', (ctx: any) => {
       ctx.reply(`${ASSISTANT_NAME} is online.`);
     });
 
@@ -136,7 +139,7 @@ export class TelegramChannel implements Channel {
     // so they don't also get stored as messages. All other /commands flow through.
     const TELEGRAM_BOT_COMMANDS = new Set(['chatid', 'ping']);
 
-    this.bot.on('message:text', async (ctx) => {
+    this.bot.on('message:text', async (ctx: any) => {
       if (ctx.message.text.startsWith('/')) {
         const cmd = ctx.message.text.slice(1).split(/[\s@]/)[0].toLowerCase();
         if (TELEGRAM_BOT_COMMANDS.has(cmd)) return;
@@ -293,7 +296,7 @@ export class TelegramChannel implements Channel {
       deliver(`${placeholder}${caption}`);
     };
 
-    this.bot.on('message:photo', (ctx) => {
+    this.bot.on('message:photo', (ctx: any) => {
       // Telegram sends multiple sizes; last is largest
       const photos = ctx.message.photo;
       const largest = photos?.[photos.length - 1];
@@ -302,19 +305,19 @@ export class TelegramChannel implements Channel {
         filename: `photo_${ctx.message.message_id}`,
       });
     });
-    this.bot.on('message:video', (ctx) => {
+    this.bot.on('message:video', (ctx: any) => {
       storeMedia(ctx, '[Video]', {
         fileId: ctx.message.video?.file_id,
         filename: `video_${ctx.message.message_id}`,
       });
     });
-    this.bot.on('message:voice', (ctx) => {
+    this.bot.on('message:voice', (ctx: any) => {
       storeMedia(ctx, '[Voice message]', {
         fileId: ctx.message.voice?.file_id,
         filename: `voice_${ctx.message.message_id}`,
       });
     });
-    this.bot.on('message:audio', (ctx) => {
+    this.bot.on('message:audio', (ctx: any) => {
       const name =
         ctx.message.audio?.file_name || `audio_${ctx.message.message_id}`;
       storeMedia(ctx, '[Audio]', {
@@ -322,29 +325,29 @@ export class TelegramChannel implements Channel {
         filename: name,
       });
     });
-    this.bot.on('message:document', (ctx) => {
+    this.bot.on('message:document', (ctx: any) => {
       const name = ctx.message.document?.file_name || 'file';
       storeMedia(ctx, `[Document: ${name}]`, {
         fileId: ctx.message.document?.file_id,
         filename: name,
       });
     });
-    this.bot.on('message:sticker', (ctx) => {
+    this.bot.on('message:sticker', (ctx: any) => {
       const emoji = ctx.message.sticker?.emoji || '';
       storeMedia(ctx, `[Sticker ${emoji}]`);
     });
-    this.bot.on('message:location', (ctx) => storeMedia(ctx, '[Location]'));
-    this.bot.on('message:contact', (ctx) => storeMedia(ctx, '[Contact]'));
+    this.bot.on('message:location', (ctx: any) => storeMedia(ctx, '[Location]'));
+    this.bot.on('message:contact', (ctx: any) => storeMedia(ctx, '[Contact]'));
 
     // Handle errors gracefully
-    this.bot.catch((err) => {
+    this.bot.catch((err: any) => {
       logger.error({ err: err.message }, 'Telegram bot error');
     });
 
     // Start polling — returns a Promise that resolves when started
     return new Promise<void>((resolve) => {
       this.bot!.start({
-        onStart: (botInfo) => {
+        onStart: (botInfo: any) => {
           logger.info(
             { username: botInfo.username, id: botInfo.id },
             'Telegram bot connected',
