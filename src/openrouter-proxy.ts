@@ -56,17 +56,29 @@ export function startOpenRouterProxy(): string | null {
     req.on('end', () => {
       let body = Buffer.concat(bodyChunks);
 
-      // Rewrite model name if OPENROUTER_MODEL is configured
-      // The SDK sends claude-sonnet-4-6 etc but we want to use a cheaper model
-      if (modelOverride && body.length > 0) {
+      // Rewrite model name and sanitize fields for OpenRouter compatibility
+      if (body.length > 0) {
         try {
           const parsed = JSON.parse(body.toString());
-          if (parsed.model) {
+          let modified = false;
+
+          // Rewrite model if OPENROUTER_MODEL is configured
+          if (modelOverride && parsed.model) {
             logger.info(
               { from: parsed.model, to: modelOverride },
               'Proxy: rewriting model',
             );
             parsed.model = modelOverride;
+            modified = true;
+          }
+
+          // Fix stream field — OpenRouter requires boolean, SDK may send null
+          if ('stream' in parsed && parsed.stream === null) {
+            parsed.stream = true;
+            modified = true;
+          }
+
+          if (modified) {
             body = Buffer.from(JSON.stringify(parsed));
           }
         } catch {
