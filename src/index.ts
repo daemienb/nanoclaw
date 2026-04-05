@@ -703,6 +703,13 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
+  // Initialize Telegram bot pool for Agent Swarm
+  const { TELEGRAM_BOT_POOL } = await import('./config.js');
+  if (TELEGRAM_BOT_POOL.length > 0) {
+    const { initBotPool } = await import('./channels/telegram.js');
+    await initBotPool(TELEGRAM_BOT_POOL);
+  }
+
   // Start subsystems (independently of connection handler)
   startSchedulerLoop({
     registeredGroups: () => registeredGroups,
