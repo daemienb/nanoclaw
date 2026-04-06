@@ -93,7 +93,11 @@ export async function sendPoolMessage(
       await sendTelegramMessage(api, numericId, text);
     } else {
       for (let i = 0; i < text.length; i += MAX_LENGTH) {
-        await sendTelegramMessage(api, numericId, text.slice(i, i + MAX_LENGTH));
+        await sendTelegramMessage(
+          api,
+          numericId,
+          text.slice(i, i + MAX_LENGTH),
+        );
       }
     }
     logger.info(

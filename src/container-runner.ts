@@ -251,6 +251,10 @@ async function buildContainerArgs(
 ): Promise<string[]> {
   const args: string[] = ['run', '-i', '--rm', '--name', containerName];
 
+  // Chromium (used by agent-browser/Playwright) requires at least 256MB of
+  // shared memory. The default Docker shm is only 64MB which causes CDP crashes.
+  args.push('--shm-size=256m');
+
   // Pass host timezone so container's local time matches the user's
   args.push('-e', `TZ=${TIMEZONE}`);
 
