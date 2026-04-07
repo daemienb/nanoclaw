@@ -157,6 +157,9 @@ export function startOpenRouterProxy(): string | null {
       if (basePath.endsWith('/v1') && pathname.startsWith('/v1/')) {
         adjustedPath = pathname.slice(3); // /v1/messages -> /messages
       }
+      // Strip ?beta=true — this triggers Anthropic context-management features
+      // that OpenRouter doesn't support, causing 400 errors.
+      adjustedPath = adjustedPath.replace(/[?&]beta=true/g, '').replace(/\?$/, '');
       const upstream = new URL(basePath + adjustedPath, baseUrl);
 
       logger.info(
