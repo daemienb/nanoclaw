@@ -265,6 +265,19 @@ async function buildContainerArgs(
   // shared memory. The default Docker shm is only 64MB which causes CDP crashes.
   args.push('--shm-size=256m');
 
+  // Share the host IPC namespace so Chromium's renderer processes can use
+  // POSIX shared memory (/dev/shm). Without this, renderer processes crash
+  // inside Docker-in-Docker with "CDP response channel closed" errors.
+  args.push('--ipc=host');
+
+  // Pass Chromium launch flags to agent-browser via env var.
+  // --disable-dev-shm-usage: use /tmp instead of /dev/shm (belt-and-suspenders)
+  // --no-sandbox + --disable-setuid-sandbox: required in container environments
+  args.push(
+    '-e',
+    'AGENT_BROWSER_ARGS=--no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage',
+  );
+
   // Pass host timezone so container's local time matches the user's
   args.push('-e', `TZ=${TIMEZONE}`);
 
