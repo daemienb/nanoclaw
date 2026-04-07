@@ -167,6 +167,9 @@ export function startOpenRouterProxy(): string | null {
       const headers: Record<string, string> = {};
       for (const [key, value] of Object.entries(req.headers)) {
         if (key === 'host' || key === 'connection') continue;
+        // Strip anthropic-beta — OpenRouter rejects Anthropic-specific betas like
+        // context-management-2025-06-27 with a 400 error.
+        if (key === 'anthropic-beta') continue;
         if (value) headers[key] = Array.isArray(value) ? value[0] : value;
       }
       if (apiKey) {
