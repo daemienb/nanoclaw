@@ -14,6 +14,11 @@ RUN npm run build
 # ── Stage 2: Runtime ──────────────────────────────────────────────────────────
 FROM node:22-slim
 
+# Cache-busting ARG — injected by CI with the git SHA so containerd
+# always treats each build as a distinct image, preventing stale caches.
+ARG GIT_SHA=unknown
+LABEL git-sha=$GIT_SHA
+
 # Install docker CLI (no daemon — connects to docker:dind sidecar via DOCKER_HOST)
 RUN apt-get update && apt-get install -y ca-certificates curl gnupg && \
     install -m 0755 -d /etc/apt/keyrings && \
@@ -42,4 +47,3 @@ RUN mkdir -p store groups data logs
 EXPOSE 3001
 
 CMD ["node", "dist/index.js"]
-
