@@ -110,7 +110,8 @@ export function startOpenRouterProxy(): string | null {
           }
           if (Array.isArray(parsed.betas)) {
             const filtered = parsed.betas.filter(
-              (b: string) => !b.includes('thinking') && !b.includes('interleaved'),
+              (b: string) =>
+                !b.includes('thinking') && !b.includes('interleaved'),
             );
             if (filtered.length !== parsed.betas.length) {
               logger.info('Proxy: stripping thinking betas for OpenRouter');
@@ -125,10 +126,13 @@ export function startOpenRouterProxy(): string | null {
                 const before = msg.content.length;
                 msg.content = msg.content.filter(
                   (block: { type?: string }) =>
-                    block.type !== 'thinking' && block.type !== 'redacted_thinking',
+                    block.type !== 'thinking' &&
+                    block.type !== 'redacted_thinking',
                 );
                 if (msg.content.length !== before) {
-                  logger.info('Proxy: stripped thinking blocks from message content');
+                  logger.info(
+                    'Proxy: stripped thinking blocks from message content',
+                  );
                   modified = true;
                 }
               }
