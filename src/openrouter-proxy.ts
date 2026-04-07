@@ -159,7 +159,9 @@ export function startOpenRouterProxy(): string | null {
       }
       // Strip ?beta=true — this triggers Anthropic context-management features
       // that OpenRouter doesn't support, causing 400 errors.
-      adjustedPath = adjustedPath.replace(/[?&]beta=true/g, '').replace(/\?$/, '');
+      adjustedPath = adjustedPath
+        .replace(/[?&]beta=true/g, '')
+        .replace(/\?$/, '');
       const upstream = new URL(basePath + adjustedPath, baseUrl);
 
       logger.info(
