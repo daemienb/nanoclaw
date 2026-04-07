@@ -32,6 +32,9 @@ COPY package*.json ./
 # Agent skills and agent-runner source (synced into per-group dirs at runtime)
 COPY container/ ./container/
 
+# Runtime scripts (e.g. cleanup-sessions.sh used by session-cleanup.ts)
+COPY scripts/ ./scripts/
+
 # Runtime directories — overridden by PVC mounts in Kubernetes
 RUN mkdir -p store groups data logs
 
