@@ -90,6 +90,51 @@ export function startOpenRouterProxy(): string | null {
           }
           // If stream is missing entirely, don't add it
 
+          // Strip Anthropic-specific fields that cause 400 errors on
+          // non-Anthropic models via OpenRouter (e.g. Gemini 3.x):
+          //
+          // 1. thinking blocks — Gemini uses its own thinking API, not
+          //    Anthropic's {"type":"thinking","budget_tokens":N} format.
+          //    Sending this causes a 400 "unknown field" error.
+          //
+          // 2. betas header / anthropic-beta — extended thinking beta
+          //    is Anthropic-specific and rejected by OpenRouter for Gemini.
+          //
+          // 3. thought_signature — when the SDK sends a follow-up with
+          //    a prior thinking block, it includes thought_signature in
+          //    the content array. Strip these before forwarding.
+          if (parsed.thinking !== undefined) {
+            logger.info('Proxy: stripping thinking field for OpenRouter');
+            delete parsed.thinking;
+            modified = true;
+          }
+          if (Array.isArray(parsed.betas)) {
+            const filtered = parsed.betas.filter(
+              (b: string) => !b.includes('thinking') && !b.includes('interleaved'),
+            );
+            if (filtered.length !== parsed.betas.length) {
+              logger.info('Proxy: stripping thinking betas for OpenRouter');
+              parsed.betas = filtered.length > 0 ? filtered : undefined;
+              modified = true;
+            }
+          }
+          // Strip thought_signature from message content blocks
+          if (Array.isArray(parsed.messages)) {
+            for (const msg of parsed.messages) {
+              if (Array.isArray(msg.content)) {
+                const before = msg.content.length;
+                msg.content = msg.content.filter(
+                  (block: { type?: string }) =>
+                    block.type !== 'thinking' && block.type !== 'redacted_thinking',
+                );
+                if (msg.content.length !== before) {
+                  logger.info('Proxy: stripped thinking blocks from message content');
+                  modified = true;
+                }
+              }
+            }
+          }
+
           if (modified) {
             body = Buffer.from(JSON.stringify(parsed));
           }
