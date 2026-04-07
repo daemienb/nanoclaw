@@ -697,9 +697,6 @@ async function main(): Promise<void> {
   // Create and connect all registered channels.
   // Each channel self-registers via the barrel import above.
   // Factories return null when credentials are missing, so unconfigured channels are skipped.
-  // Channels that fail to connect are retried in the background with exponential backoff
-  // so the service stays alive even if the network is temporarily down.
-  let configuredChannelCount = 0;
   for (const channelName of getRegisteredChannelNames()) {
     const factory = getChannelFactory(channelName)!;
     const channel = factory(channelOpts);
@@ -710,20 +707,11 @@ async function main(): Promise<void> {
       );
       continue;
     }
-    configuredChannelCount++;
-    try {
-      await channel.connect();
-      channels.push(channel);
-    } catch (err) {
-      logger.warn(
-        { channel: channelName, err },
-        'Channel failed to connect -- will retry in background',
-      );
-      retryChannelConnect(channel, channels);
-    }
+    channels.push(channel);
+    await channel.connect();
   }
-  if (configuredChannelCount === 0) {
-    logger.fatal('No channels configured');
+  if (channels.length === 0) {
+    logger.fatal('No channels connected');
     process.exit(1);
   }
 
