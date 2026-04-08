@@ -208,16 +208,6 @@ function buildVolumeMounts(
     readonly: false,
   });
 
-  // Persistent Chromium browser profile — keeps cookies and sessions
-  // across container runs so sites like Google don't show consent walls
-  // every time. Shared across all agents in the same group.
-  const browserProfileDir = path.join(DATA_DIR, 'browser-profile', group.folder);
-  fs.mkdirSync(browserProfileDir, { recursive: true });
-  mounts.push({
-    hostPath: browserProfileDir,
-    containerPath: '/app/data/browser-profile',
-    readonly: false,
-  });
 
   // Copy agent-runner source into a per-group writable location so agents
   // can customize it (add tools, change behavior) without affecting other
@@ -275,12 +265,9 @@ async function buildContainerArgs(
   // Pass Chromium launch flags to agent-browser via env var.
   // --disable-dev-shm-usage: use /tmp instead of /dev/shm (belt-and-suspenders)
   // --no-sandbox + --disable-setuid-sandbox: required in container environments
-  // --user-data-dir: persist cookies/sessions across container runs (fixes
-  //   Google consent wall and other cookie-dependent sites)
-  const browserProfileDir = '/app/data/browser-profile';
   args.push(
     '-e',
-    `AGENT_BROWSER_ARGS=--no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage,--user-data-dir=${browserProfileDir}`,
+    'AGENT_BROWSER_ARGS=--no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage',
   );
 
   // Pass host timezone so container's local time matches the user's
