@@ -100,7 +100,7 @@ export function startOpenRouterProxy(): string | null {
           // on non-Anthropic models via OpenRouter.
           // The SDK can send: thinking, betas, context, metadata.context,
           // cache_control, and other Anthropic-only features.
-          const anthropicOnlyFields = ['thinking', 'betas', 'context'];
+          const anthropicOnlyFields = ['thinking', 'betas', 'context', 'context_management', 'output_config'];
           for (const field of anthropicOnlyFields) {
             if (field in parsed) {
               logger.info(
