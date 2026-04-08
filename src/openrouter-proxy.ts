@@ -135,23 +135,17 @@ export function startOpenRouterProxy(): string | null {
           // Clean message content blocks — strip thinking, redacted_thinking,
           // thought_signature blocks, and cache_control from content
           if (Array.isArray(cleaned.messages)) {
-            for (const msg of cleaned.messages as Array<{
-              content?: unknown;
-              cache_control?: unknown;
-            }>) {
+            for (const msg of cleaned.messages as Array<Record<string, unknown>>) {
               // Strip cache_control from message level
               delete msg.cache_control;
 
               if (Array.isArray(msg.content)) {
-                msg.content = msg.content.filter(
-                  (block: { type?: string }) =>
-                    ALLOWED_CONTENT_TYPES.has(block.type || ''),
+                msg.content = (msg.content as Array<Record<string, unknown>>).filter(
+                  (block) => ALLOWED_CONTENT_TYPES.has((block.type as string) || ''),
                 );
                 // Strip cache_control from each content block
-                for (const block of msg.content) {
-                  if (block && typeof block === 'object') {
-                    delete (block as Record<string, unknown>).cache_control;
-                  }
+                for (const block of msg.content as Array<Record<string, unknown>>) {
+                  delete block.cache_control;
                 }
               }
             }
