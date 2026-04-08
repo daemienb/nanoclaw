@@ -56,11 +56,43 @@ export function startOpenRouterProxy(): string | null {
     req.on('end', () => {
       let body = Buffer.concat(bodyChunks);
 
-      // Rewrite model name and sanitize fields for OpenRouter compatibility
+      // ── WHITELIST APPROACH ──────────────────────────────────────────
+      // Instead of blacklisting Anthropic-only fields (which breaks every
+      // time the SDK adds a new one), we whitelist only the fields that
+      // OpenRouter's Anthropic-compatible Messages API accepts.
+      // Any field not in this list is silently dropped.
+      const ALLOWED_BODY_FIELDS = new Set([
+        'model',
+        'messages',
+        'system',
+        'tools',
+        'tool_choice',
+        'metadata',
+        'max_tokens',
+        'stream',
+        'temperature',
+        'top_p',
+        'top_k',
+        'stop_sequences',
+      ]);
+
+      // Content block types that OpenRouter understands
+      const ALLOWED_CONTENT_TYPES = new Set([
+        'text',
+        'image',
+        'tool_use',
+        'tool_result',
+      ]);
+
       if (body.length > 0) {
         try {
           const parsed = JSON.parse(body.toString());
-          let modified = false;
+
+          // Log original keys for debugging
+          logger.info(
+            { bodyKeys: Object.keys(parsed) },
+            'Proxy: request body keys (before whitelist)',
+          );
 
           // Rewrite model if OPENROUTER_MODEL is configured
           if (modelOverride && parsed.model) {
@@ -69,78 +101,72 @@ export function startOpenRouterProxy(): string | null {
               'Proxy: rewriting model',
             );
             parsed.model = modelOverride;
-            modified = true;
           }
 
-          // Log all top-level body keys for debugging OpenRouter 400s
-          logger.info(
-            { bodyKeys: Object.keys(parsed) },
-            'Proxy: request body keys',
+          // Force stream to true — some OpenRouter models (e.g. Gemini)
+          // require streaming via the Anthropic messages API.
+          if ('stream' in parsed && parsed.stream !== true) {
+            logger.info(
+              { streamValue: parsed.stream },
+              'Proxy: forcing stream=true',
+            );
+            parsed.stream = true;
+          }
+
+          // Build a clean body with only whitelisted fields
+          const cleaned: Record<string, unknown> = {};
+          for (const key of ALLOWED_BODY_FIELDS) {
+            if (key in parsed) {
+              cleaned[key] = parsed[key];
+            }
+          }
+
+          // Log what was stripped
+          const strippedKeys = Object.keys(parsed).filter(
+            (k) => !ALLOWED_BODY_FIELDS.has(k),
           );
+          if (strippedKeys.length > 0) {
+            logger.info(
+              { strippedKeys },
+              'Proxy: stripped non-whitelisted fields',
+            );
+          }
 
-          // Force stream to true for messages endpoint — some OpenRouter models
-          // (e.g. Gemini) require streaming via the Anthropic messages API.
-          // The SDK sometimes sends stream:false or stream:null.
-          if ('stream' in parsed) {
-            if (parsed.stream !== true) {
-              logger.info(
-                {
-                  streamValue: parsed.stream,
-                  streamType: typeof parsed.stream,
-                },
-                'Proxy: forcing stream=true',
-              );
-              parsed.stream = true;
-              modified = true;
-            }
-          }
-          // If stream is missing entirely, don't add it
+          // Clean message content blocks — strip thinking, redacted_thinking,
+          // thought_signature blocks, and cache_control from content
+          if (Array.isArray(cleaned.messages)) {
+            for (const msg of cleaned.messages as Array<{
+              content?: unknown;
+              cache_control?: unknown;
+            }>) {
+              // Strip cache_control from message level
+              delete msg.cache_control;
 
-          // Strip ALL Anthropic-specific fields that cause 400 errors
-          // on non-Anthropic models via OpenRouter.
-          // The SDK can send: thinking, betas, context, metadata.context,
-          // cache_control, and other Anthropic-only features.
-          const anthropicOnlyFields = ['thinking', 'betas', 'context', 'context_management', 'output_config'];
-          for (const field of anthropicOnlyFields) {
-            if (field in parsed) {
-              logger.info(
-                { field, value: typeof parsed[field] },
-                'Proxy: stripping Anthropic field',
-              );
-              delete parsed[field];
-              modified = true;
-            }
-          }
-          // Strip metadata.context if present
-          if (parsed.metadata && typeof parsed.metadata === 'object') {
-            if ('context' in parsed.metadata) {
-              delete parsed.metadata.context;
-              modified = true;
-            }
-          }
-          // Strip thought_signature from message content blocks
-          if (Array.isArray(parsed.messages)) {
-            for (const msg of parsed.messages) {
               if (Array.isArray(msg.content)) {
-                const before = msg.content.length;
                 msg.content = msg.content.filter(
                   (block: { type?: string }) =>
-                    block.type !== 'thinking' &&
-                    block.type !== 'redacted_thinking',
+                    ALLOWED_CONTENT_TYPES.has(block.type || ''),
                 );
-                if (msg.content.length !== before) {
-                  logger.info(
-                    'Proxy: stripped thinking blocks from message content',
-                  );
-                  modified = true;
+                // Strip cache_control from each content block
+                for (const block of msg.content) {
+                  if (block && typeof block === 'object') {
+                    delete (block as Record<string, unknown>).cache_control;
+                  }
                 }
               }
             }
           }
 
-          if (modified) {
-            body = Buffer.from(JSON.stringify(parsed));
+          // Clean system prompt — strip cache_control
+          if (Array.isArray(cleaned.system)) {
+            for (const block of cleaned.system as Array<
+              Record<string, unknown>
+            >) {
+              delete block.cache_control;
+            }
           }
+
+          body = Buffer.from(JSON.stringify(cleaned));
         } catch {
           // Not JSON or parse error — forward as-is
         }
@@ -168,12 +194,19 @@ export function startOpenRouterProxy(): string | null {
         'Proxy: forwarding request',
       );
 
+      // ── HEADER WHITELIST ────────────────────────────────────────────
+      // Only forward headers that OpenRouter expects. This strips
+      // anthropic-beta, anthropic-version, and any future Anthropic-only
+      // headers automatically.
+      const ALLOWED_HEADERS = new Set([
+        'content-type',
+        'accept',
+        'user-agent',
+        'x-request-id',
+      ]);
       const headers: Record<string, string> = {};
       for (const [key, value] of Object.entries(req.headers)) {
-        if (key === 'host' || key === 'connection') continue;
-        // Strip anthropic-beta — OpenRouter rejects Anthropic-specific betas like
-        // context-management-2025-06-27 with a 400 error.
-        if (key === 'anthropic-beta') continue;
+        if (!ALLOWED_HEADERS.has(key)) continue;
         if (value) headers[key] = Array.isArray(value) ? value[0] : value;
       }
       if (apiKey) {
