@@ -103,7 +103,10 @@ export function startOpenRouterProxy(): string | null {
           const anthropicOnlyFields = ['thinking', 'betas', 'context'];
           for (const field of anthropicOnlyFields) {
             if (field in parsed) {
-              logger.info({ field, value: typeof parsed[field] }, 'Proxy: stripping Anthropic field');
+              logger.info(
+                { field, value: typeof parsed[field] },
+                'Proxy: stripping Anthropic field',
+              );
               delete parsed[field];
               modified = true;
             }
