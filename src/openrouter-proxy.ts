@@ -109,15 +109,12 @@ export function startOpenRouterProxy(): string | null {
             modified = true;
           }
           if (Array.isArray(parsed.betas)) {
-            const filtered = parsed.betas.filter(
-              (b: string) =>
-                !b.includes('thinking') && !b.includes('interleaved'),
+            logger.info(
+              { betas: parsed.betas },
+              'Proxy: stripping all betas for OpenRouter',
             );
-            if (filtered.length !== parsed.betas.length) {
-              logger.info('Proxy: stripping thinking betas for OpenRouter');
-              parsed.betas = filtered.length > 0 ? filtered : undefined;
-              modified = true;
-            }
+            delete parsed.betas;
+            modified = true;
           }
           // Strip thought_signature from message content blocks
           if (Array.isArray(parsed.messages)) {
