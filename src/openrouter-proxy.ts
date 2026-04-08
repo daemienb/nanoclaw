@@ -72,6 +72,12 @@ export function startOpenRouterProxy(): string | null {
             modified = true;
           }
 
+          // Log all top-level body keys for debugging OpenRouter 400s
+          logger.info(
+            { bodyKeys: Object.keys(parsed) },
+            'Proxy: request body keys',
+          );
+
           // Force stream to true for messages endpoint — some OpenRouter models
           // (e.g. Gemini) require streaming via the Anthropic messages API.
           // The SDK sometimes sends stream:false or stream:null.
@@ -90,31 +96,24 @@ export function startOpenRouterProxy(): string | null {
           }
           // If stream is missing entirely, don't add it
 
-          // Strip Anthropic-specific fields that cause 400 errors on
-          // non-Anthropic models via OpenRouter (e.g. Gemini 3.x):
-          //
-          // 1. thinking blocks — Gemini uses its own thinking API, not
-          //    Anthropic's {"type":"thinking","budget_tokens":N} format.
-          //    Sending this causes a 400 "unknown field" error.
-          //
-          // 2. betas header / anthropic-beta — extended thinking beta
-          //    is Anthropic-specific and rejected by OpenRouter for Gemini.
-          //
-          // 3. thought_signature — when the SDK sends a follow-up with
-          //    a prior thinking block, it includes thought_signature in
-          //    the content array. Strip these before forwarding.
-          if (parsed.thinking !== undefined) {
-            logger.info('Proxy: stripping thinking field for OpenRouter');
-            delete parsed.thinking;
-            modified = true;
+          // Strip ALL Anthropic-specific fields that cause 400 errors
+          // on non-Anthropic models via OpenRouter.
+          // The SDK can send: thinking, betas, context, metadata.context,
+          // cache_control, and other Anthropic-only features.
+          const anthropicOnlyFields = ['thinking', 'betas', 'context'];
+          for (const field of anthropicOnlyFields) {
+            if (field in parsed) {
+              logger.info({ field, value: typeof parsed[field] }, 'Proxy: stripping Anthropic field');
+              delete parsed[field];
+              modified = true;
+            }
           }
-          if (Array.isArray(parsed.betas)) {
-            logger.info(
-              { betas: parsed.betas },
-              'Proxy: stripping all betas for OpenRouter',
-            );
-            delete parsed.betas;
-            modified = true;
+          // Strip metadata.context if present
+          if (parsed.metadata && typeof parsed.metadata === 'object') {
+            if ('context' in parsed.metadata) {
+              delete parsed.metadata.context;
+              modified = true;
+            }
           }
           // Strip thought_signature from message content blocks
           if (Array.isArray(parsed.messages)) {
